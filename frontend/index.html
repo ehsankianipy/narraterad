@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NarrateRad</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+      background: #f5f5f5;
+      color: #1a1a1a;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ─────────────────────────────────────────────────────────── */
+    header {
+      background: #fff;
+      border-bottom: 1px solid #e5e5e5;
+      padding: 14px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .logo { font-size: 17px; font-weight: 600; letter-spacing: -0.3px; }
+    .logo span { color: #0b7a5e; }
+    .conn-badge {
+      font-size: 12px; padding: 3px 10px; border-radius: 20px;
+      font-weight: 500; background: #f0f0f0; color: #666; transition: all 0.3s;
+    }
+    .conn-badge.connected { background: #e6f4ef; color: #0b7a5e; }
+    .conn-badge.error     { background: #fdecea; color: #c0392b; }
+
+    /* ── Critical banner ─────────────────────────────────────────────────── */
+    .alert-wrap { padding: 0 28px; padding-top: 14px; max-width: 1400px; margin: 0 auto; width: 100%; }
+    .critical-banner {
+      display: none; background: #fdecea; border: 1px solid #f5b7b1;
+      border-radius: 8px; padding: 10px 16px; font-size: 13px;
+      color: #922b21; font-weight: 500; align-items: center; gap: 8px;
+    }
+    .critical-banner.visible { display: flex; }
+
+    /* ── Main grid ───────────────────────────────────────────────────────── */
+    main {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 240px 1fr 1fr;
+      gap: 16px;
+      padding: 16px 28px 28px;
+      max-width: 1400px;
+      width: 100%;
+      margin: 0 auto;
+    }
+    @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+
+    /* ── Panel shared ────────────────────────────────────────────────────── */
+    .panel {
+      background: #fff;
+      border: 1px solid #e5e5e5;
+      border-radius: 10px;
+      padding: 18px 20px;
+      display: flex;
+      flex-direction: column;
+    }
+    .panel-title {
+      font-size: 11px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.06em; color: #999; margin-bottom: 14px;
+    }
+
+    /* ── Control panel ───────────────────────────────────────────────────── */
+    .control-panel { align-items: center; gap: 16px; }
+
+    .mic-btn {
+      width: 72px; height: 72px; border-radius: 50%; border: none;
+      background: #0b7a5e; color: #fff; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.2s; box-shadow: 0 2px 12px rgba(11,122,94,0.25);
+    }
+    .mic-btn:hover { transform: scale(1.05); }
+    .mic-btn:active { transform: scale(0.97); }
+    .mic-btn.recording {
+      background: #c0392b;
+      box-shadow: 0 2px 12px rgba(192,57,43,0.35);
+      animation: pulse 1.5s infinite;
+    }
+    .mic-btn.disabled { background: #ccc; cursor: not-allowed; box-shadow: none; }
+
+    @keyframes pulse {
+      0%   { box-shadow: 0 0 0 0 rgba(192,57,43,0.4); }
+      70%  { box-shadow: 0 0 0 12px rgba(192,57,43,0); }
+      100% { box-shadow: 0 0 0 0 rgba(192,57,43,0); }
+    }
+
+    .status-line { font-size: 12px; color: #888; text-align: center; min-height: 16px; }
+    .status-line.transcribing { color: #0b7a5e; font-weight: 500; }
+    .timer { font-size: 13px; color: #aaa; font-variant-numeric: tabular-nums; }
+
+    .stats { display: flex; gap: 8px; width: 100%; }
+    .stat {
+      flex: 1; background: #f8f8f8; border-radius: 8px;
+      padding: 8px 10px; text-align: center;
+    }
+    .stat-val { font-size: 20px; font-weight: 500; color: #1a1a1a; line-height: 1; }
+    .stat-lbl { font-size: 10px; color: #999; margin-top: 3px; }
+
+    .divider { width: 100%; height: 1px; background: #f0f0f0; }
+
+    /* ── Transcript panel ────────────────────────────────────────────────── */
+    .transcript-header {
+      display: flex; align-items: center;
+      justify-content: space-between; margin-bottom: 12px;
+    }
+    .clear-btn {
+      font-size: 11px; color: #999; background: none;
+      border: 1px solid #e5e5e5; border-radius: 5px;
+      padding: 3px 8px; cursor: pointer;
+    }
+    .clear-btn:hover { background: #f5f5f5; }
+
+    .transcript-body {
+      flex: 1; min-height: 260px; max-height: 380px;
+      overflow-y: auto; font-size: 14px; line-height: 1.8;
+      color: #1a1a1a; padding: 2px 0;
+    }
+    .transcript-body:empty::before {
+      content: "Your dictation will appear here as you speak...";
+      color: #ccc; font-style: italic; font-size: 13px;
+    }
+
+    .word { display: inline; }
+    .word.flagged {
+      color: #b06c00; background: #fff8ec;
+      border-radius: 3px; padding: 1px 3px; cursor: help;
+      border-bottom: 1.5px solid #e0a840;
+    }
+    .chunk-sep { display: block; height: 1px; background: #f5f5f5; margin: 6px 0; }
+
+    .flag-bar-wrap { margin-top: 10px; padding-top: 10px; border-top: 1px solid #f0f0f0; }
+    .flag-bar-label {
+      font-size: 11px; color: #aaa; margin-bottom: 4px;
+      display: flex; justify-content: space-between;
+    }
+    .flag-bar-track { height: 3px; background: #f0f0f0; border-radius: 2px; overflow: hidden; }
+    .flag-bar-fill { height: 100%; background: #e0a840; border-radius: 2px; width: 0%; transition: width 0.4s; }
+
+    /* NLP flags list */
+    .nlp-flags { margin-top: 10px; display: flex; flex-direction: column; gap: 5px; }
+    .nlp-flag {
+      font-size: 11px; padding: 5px 10px; border-radius: 6px;
+      line-height: 1.4;
+    }
+    .nlp-flag.warning  { background: #fffbec; color: #7a5000; border: 1px solid #f5e0a0; }
+    .nlp-flag.critical { background: #fdecea; color: #922b21; border: 1px solid #f5b7b1; }
+
+    /* ── Structure panel ─────────────────────────────────────────────────── */
+    .structure-panel { gap: 0; }
+
+    .structure-btn {
+      width: 100%; padding: 10px; background: #0b7a5e; color: #fff;
+      border: none; border-radius: 8px; font-size: 13px; font-weight: 500;
+      cursor: pointer; margin-bottom: 14px; transition: background 0.2s;
+      font-family: inherit;
+    }
+    .structure-btn:hover { background: #096b52; }
+    .structure-btn:disabled { background: #aaa; cursor: not-allowed; }
+
+    .structure-body {
+      flex: 1; min-height: 260px; max-height: 440px;
+      overflow-y: auto; font-size: 13px; line-height: 1.8;
+      color: #1a1a1a; white-space: pre-wrap; font-family: "Menlo", "Monaco", monospace;
+    }
+    .structure-body:empty::before {
+      content: "Click 'Structure report' after dictating to generate a formatted report...";
+      color: #ccc; font-style: italic; font-size: 12px; font-family: inherit;
+    }
+
+    .copy-btn {
+      margin-top: 10px; padding-top: 10px; border-top: 1px solid #f0f0f0;
+      display: flex; justify-content: flex-end; gap: 8px;
+    }
+    .copy-btn button {
+      font-size: 11px; color: #888; background: none; border: 1px solid #e5e5e5;
+      border-radius: 5px; padding: 4px 10px; cursor: pointer; font-family: inherit;
+    }
+    .copy-btn button:hover { background: #f5f5f5; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="logo">Narrate<span>Rad</span></div>
+    <div class="conn-badge" id="connBadge">Connecting...</div>
+  </header>
+
+  <div class="alert-wrap">
+    <div class="critical-banner" id="criticalBanner">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+        <path d="M8 1L15 14H1L8 1Z" stroke="#922b21" stroke-width="1.5" fill="none"/>
+        <path d="M8 6V9" stroke="#922b21" stroke-width="1.5" stroke-linecap="round"/>
+        <circle cx="8" cy="11.5" r="0.75" fill="#922b21"/>
+      </svg>
+      <span id="criticalMessage">Critical finding detected</span>
+    </div>
+  </div>
+
+  <main>
+
+    <!-- Col 1: Controls -->
+    <div class="panel control-panel">
+      <div class="panel-title">Controls</div>
+
+      <button class="mic-btn disabled" id="micBtn" onclick="toggleMic()">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+          <line x1="12" y1="19" x2="12" y2="23"/>
+          <line x1="8" y1="23" x2="16" y2="23"/>
+        </svg>
+      </button>
+
+      <div class="status-line" id="statusLine">Waiting...</div>
+      <div class="timer" id="timer">00:00</div>
+
+      <div class="stats">
+        <div class="stat">
+          <div class="stat-val" id="wordCount">0</div>
+          <div class="stat-lbl">Words</div>
+        </div>
+        <div class="stat">
+          <div class="stat-val" id="flagCount">0</div>
+          <div class="stat-lbl">Flagged</div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="flag-bar-wrap" style="width:100%;margin-top:0;padding-top:0;border-top:none">
+        <div class="flag-bar-label">
+          <span>Confidence</span>
+          <span id="flagRatePct">0%</span>
+        </div>
+        <div class="flag-bar-track">
+          <div class="flag-bar-fill" id="flagBarFill"></div>
+        </div>
+      </div>
+
+      <div class="nlp-flags" id="nlpFlags"></div>
+    </div>
+
+    <!-- Col 2: Live transcript -->
+    <div class="panel">
+      <div class="transcript-header">
+        <div class="panel-title" style="margin-bottom:0">Live transcript</div>
+        <button class="clear-btn" onclick="clearAll()">Clear</button>
+      </div>
+      <div class="transcript-body" id="transcriptBody"></div>
+    </div>
+
+    <!-- Col 3: Structured report -->
+    <div class="panel structure-panel">
+      <div class="panel-title">Structured report</div>
+      <button class="structure-btn" id="structureBtn" onclick="structureReport()">
+        Structure report
+      </button>
+      <div class="structure-body" id="structuredReport"></div>
+      <div class="copy-btn">
+        <button onclick="copyReport()">Copy report</button>
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    let ws = null, audioCtx = null, processor = null, micStream = null;
+    let recording = false, timerInterval = null, timerSeconds = 0;
+    let totalWords = 0, totalFlagged = 0;
+
+    // ── WebSocket ───────────────────────────────────────────────────────────
+    function connectWS() {
+      ws = new WebSocket("ws://localhost:8000/ws");
+      ws.binaryType = "arraybuffer";
+
+      ws.onopen = () => {
+        setBadge("Connected", "connected");
+        document.getElementById("micBtn").classList.remove("disabled");
+      };
+      ws.onmessage = (e) => handleMessage(JSON.parse(e.data));
+      ws.onclose = () => {
+        setBadge("Disconnected", "error");
+        document.getElementById("micBtn").classList.add("disabled");
+        setStatus("Disconnected — reload to reconnect");
+        setTimeout(connectWS, 3000);
+      };
+      ws.onerror = () => setBadge("Error", "error");
+    }
+
+    function handleMessage(msg) {
+      if (msg.type === "status") {
+        setStatus(msg.message);
+        document.getElementById("statusLine").className =
+          "status-line" + (msg.message.toLowerCase().includes("transcribing") ? " transcribing" : "");
+        return;
+      }
+      if (msg.type === "transcript_update") {
+        appendWords(msg.words);
+        updateFlagRate(msg.flag_rate);
+        return;
+      }
+      if (msg.type === "nlp_flags") {
+        showNlpFlags(msg.flags);
+        return;
+      }
+    }
+
+    // ── Mic / Audio ─────────────────────────────────────────────────────────
+    async function toggleMic() {
+      if (document.getElementById("micBtn").classList.contains("disabled")) return;
+      recording ? stopRecording() : await startRecording();
+    }
+
+    async function startRecording() {
+      try {
+        micStream = await navigator.mediaDevices.getUserMedia({
+          audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true }
+        });
+      } catch {
+        setStatus("Mic access denied — check System Settings → Privacy → Microphone");
+        return;
+      }
+      audioCtx = new AudioContext({ sampleRate: 16000 });
+      const source = audioCtx.createMediaStreamSource(micStream);
+      processor = audioCtx.createScriptProcessor(4096, 1, 1);
+      source.connect(processor);
+      processor.connect(audioCtx.destination);
+      processor.onaudioprocess = (e) => {
+        if (ws && ws.readyState === WebSocket.OPEN)
+          ws.send(e.inputBuffer.getChannelData(0).buffer);
+      };
+      recording = true;
+      document.getElementById("micBtn").classList.add("recording");
+      setStatus("Listening...");
+      startTimer();
+    }
+
+    function stopRecording() {
+      if (processor)  { processor.disconnect(); processor = null; }
+      if (audioCtx)   { audioCtx.close(); audioCtx = null; }
+      if (micStream)  { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
+      recording = false;
+      document.getElementById("micBtn").classList.remove("recording");
+      setStatus("Stopped");
+      stopTimer();
+    }
+
+    // ── Transcript rendering ────────────────────────────────────────────────
+    function appendWords(words) {
+      const body = document.getElementById("transcriptBody");
+      if (body.innerHTML.trim()) {
+        const sep = document.createElement("span");
+        sep.className = "chunk-sep";
+        body.appendChild(sep);
+      }
+      words.forEach((w, i) => {
+        const span = document.createElement("span");
+        span.className = "word" + (w.flagged ? " flagged" : "");
+        span.textContent = (i === 0 ? "" : " ") + w.text;
+        if (w.flagged) span.title = `Low confidence: ${(w.probability * 100).toFixed(0)}%`;
+        body.appendChild(span);
+        totalWords++;
+        if (w.flagged) totalFlagged++;
+      });
+      document.getElementById("wordCount").textContent = totalWords;
+      document.getElementById("flagCount").textContent = totalFlagged;
+      body.scrollTop = body.scrollHeight;
+      checkCritical(words.map(w => w.text).join(" ").toLowerCase());
+    }
+
+    function updateFlagRate(rate) {
+      const pct = Math.round(rate * 100);
+      document.getElementById("flagRatePct").textContent = pct + "%";
+      document.getElementById("flagBarFill").style.width = Math.min(pct, 100) + "%";
+    }
+
+    // ── NLP flags ───────────────────────────────────────────────────────────
+    function showNlpFlags(flags) {
+      const container = document.getElementById("nlpFlags");
+      flags.forEach(f => {
+        // Show critical ones in the banner
+        if (f.severity === "critical") {
+          document.getElementById("criticalMessage").textContent = f.message;
+          document.getElementById("criticalBanner").classList.add("visible");
+        }
+        // Show all as inline flags in the sidebar
+        const el = document.createElement("div");
+        el.className = "nlp-flag " + f.severity;
+        el.textContent = f.message;
+        container.appendChild(el);
+      });
+    }
+
+    // ── Critical keywords (client-side fast check) ──────────────────────────
+    const CRITICAL_TERMS = [
+      "pneumothorax", "tension pneumothorax", "pulmonary embolism",
+      "aortic dissection", "haemorrhage", "hemorrhage", "cauda equina",
+    ];
+    function checkCritical(text) {
+      const words = text.split(/\s+/);
+      for (const term of CRITICAL_TERMS) {
+        const match = term.includes(" ") ? text.includes(term) : words.includes(term);
+        if (match) {
+          document.getElementById("criticalMessage").textContent = `Critical finding: "${term}"`;
+          document.getElementById("criticalBanner").classList.add("visible");
+          return;
+        }
+      }
+    }
+
+    // ── Structure report ────────────────────────────────────────────────────
+    async function structureReport() {
+      const text = document.getElementById("transcriptBody").innerText.trim();
+      if (!text) { alert("No transcript yet — dictate something first."); return; }
+
+      const btn = document.getElementById("structureBtn");
+      const out = document.getElementById("structuredReport");
+      btn.textContent = "Structuring...";
+      btn.disabled = true;
+      out.textContent = "Generating structured report...";
+
+      try {
+        const res = await fetch("/structure", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text })
+        });
+        const data = await res.json();
+        out.textContent = data.structured || data.error || "No output returned.";
+      } catch (e) {
+        out.textContent = "Error: " + e.message;
+      } finally {
+        btn.textContent = "Structure report";
+        btn.disabled = false;
+      }
+    }
+
+    function copyReport() {
+      const text = document.getElementById("structuredReport").textContent;
+      if (!text) return;
+      navigator.clipboard.writeText(text).then(() => {
+        const btns = document.querySelectorAll(".copy-btn button");
+        btns[0].textContent = "Copied!";
+        setTimeout(() => btns[0].textContent = "Copy report", 1500);
+      });
+    }
+
+    // ── Clear ───────────────────────────────────────────────────────────────
+    function clearAll() {
+      document.getElementById("transcriptBody").innerHTML = "";
+      document.getElementById("structuredReport").textContent = "";
+      document.getElementById("nlpFlags").innerHTML = "";
+      document.getElementById("criticalBanner").classList.remove("visible");
+      totalWords = 0; totalFlagged = 0;
+      document.getElementById("wordCount").textContent = "0";
+      document.getElementById("flagCount").textContent = "0";
+      updateFlagRate(0);
+    }
+
+    // ── Timer ───────────────────────────────────────────────────────────────
+    function startTimer() {
+      timerSeconds = 0;
+      timerInterval = setInterval(() => {
+        timerSeconds++;
+        const m = String(Math.floor(timerSeconds / 60)).padStart(2, "0");
+        const s = String(timerSeconds % 60).padStart(2, "0");
+        document.getElementById("timer").textContent = `${m}:${s}`;
+      }, 1000);
+    }
+    function stopTimer() { clearInterval(timerInterval); }
+
+    // ── Helpers ─────────────────────────────────────────────────────────────
+    function setStatus(msg) { document.getElementById("statusLine").textContent = msg; }
+    function setBadge(label, cls) {
+      const el = document.getElementById("connBadge");
+      el.textContent = label;
+      el.className = "conn-badge " + cls;
+    }
+
+    connectWS();
+  </script>
+</body>
+</html>

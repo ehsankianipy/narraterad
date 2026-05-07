@@ -1,0 +1,17 @@
+
+.venv/
+
+__pycache__/
+
+*.pyc
+
+*.pyo
+
+.python-version
+
+narraterad.db
+
+.DS_Store
+
+*.egg-info/
+

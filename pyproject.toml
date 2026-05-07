@@ -1,0 +1,16 @@
+[project]
+name = "narraterad"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.136.1",
+    "httpx>=0.28.1",
+    "mlx-whisper>=0.4.3",
+    "numpy>=2.4.4",
+    "python-multipart>=0.0.27",
+    "sounddevice>=0.5.5",
+    "uvicorn[standard]>=0.46.0",
+    "websockets>=16.0",
+]
