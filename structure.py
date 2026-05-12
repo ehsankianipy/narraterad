@@ -73,7 +73,8 @@ For MT: Please transcribe above findings into the reporting system exactly as di
 ─────────────────────────────────
 
 Strict rules:
-- Never invent findings not present in the dictation
+- CRITICAL: Never invent findings not present in the dictation. Never add bilateral or any laterality unless explicitly stated by the radiologist. If only one side is mentioned, only write that side.
+- If the radiologist says right only, write right only. Never assume the other side is involved.
 - Never omit findings that are present
 - Preserve all laterality exactly as dictated — if ambiguous, add [LATERALITY CHECK]
 - Use formal radiology terminology

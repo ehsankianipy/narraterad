@@ -352,6 +352,15 @@
         updateFlagRate(msg.flag_rate);
         return;
       }
+      if (msg.type === "radlex_corrections") {
+        msg.corrections.forEach(c => {
+        const el = document.createElement("div");
+        el.className = "nlp-flag warning";
+        el.textContent = `RadLex: "${c.original}" → "${c.standardised}"`;
+        document.getElementById("nlpFlags").appendChild(el);
+    });
+    return;
+}
       if (msg.type === "nlp_flags") {
         showNlpFlags(msg.flags);
         return;

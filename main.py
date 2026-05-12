@@ -22,6 +22,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 
 from nlp import check_all
+from radlex import standardise
 from structure import OllamaNotRunningError, PatientInfo, structure_report_stream
 from transcribe import Transcriber
 
@@ -50,16 +51,6 @@ async def index() -> HTMLResponse:
 
 @app.post("/structure")
 async def structure(payload: dict) -> dict:
-    """
-    Structure a transcript into an MT-ready preliminary report.
-
-    Accepts:
-        text           : str  — the raw transcript
-        patient_name   : str  — optional
-        patient_age    : str  — optional
-        mr_number      : str  — optional
-        referring_physician : str — optional
-    """
     text = payload.get("text", "").strip()
     if not text:
         return {"error": "No text provided"}
@@ -86,8 +77,7 @@ async def structure(payload: dict) -> dict:
 async def websocket_transcribe(ws: WebSocket) -> None:
     await ws.accept()
 
-    # Heartbeat — sends a ping every 10s to prevent Safari timeout
-    # during long Whisper transcriptions
+    # Heartbeat — keeps connection alive during long Whisper transcriptions
     async def heartbeat() -> None:
         while True:
             await asyncio.sleep(10)
@@ -122,6 +112,8 @@ async def websocket_transcribe(ws: WebSocket) -> None:
                 transcribing = False
 
                 if not result.is_empty():
+
+                    # ── Transcript update ──────────────────────────────────
                     await _send(ws, {
                         "type": "transcript_update",
                         "words": [
@@ -139,11 +131,28 @@ async def websocket_transcribe(ws: WebSocket) -> None:
                         "language": result.language,
                     })
 
+                    # ── NLP checks ─────────────────────────────────────────
                     nlp_flags = check_all(result.text)
                     if nlp_flags:
                         await _send(ws, {
                             "type": "nlp_flags",
                             "flags": [f.to_dict() for f in nlp_flags],
+                        })
+
+                    # ── RadLex standardisation ─────────────────────────────
+                    standardised_text, radlex_corrections = standardise(result.text)
+                    if radlex_corrections:
+                        await _send(ws, {
+                            "type": "radlex_corrections",
+                            "corrections": [
+                                {
+                                    "original": c.original,
+                                    "standardised": c.standardised,
+                                    "concept": c.radlex_concept,
+                                }
+                                for c in radlex_corrections
+                            ],
+                            "standardised_text": standardised_text,
                         })
 
                 await _send(ws, {"type": "status", "message": "Listening..."})
@@ -156,7 +165,7 @@ async def websocket_transcribe(ws: WebSocket) -> None:
     finally:
         heartbeat_task.cancel()
 
-        
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 

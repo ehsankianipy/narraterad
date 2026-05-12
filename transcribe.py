@@ -18,6 +18,8 @@ import re
 from dataclasses import dataclass
 
 import numpy as np
+from radlex import RADLEX_PROMPT
+RADIOLOGY_PROMPT = RADLEX_PROMPT
 
 # ── Platform detection ────────────────────────────────────────────────────────
 
@@ -116,6 +118,7 @@ class Transcriber:
         "like and subscribe",
         "see you next time",
         "please subscribe",
+        "for watching",
         "transcribed by",
         "hello",
         "bye",
